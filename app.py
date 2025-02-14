@@ -22,6 +22,7 @@ class Attendance(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     type = db.Column(db.String(10), nullable=False)
+    photo_path = db.Column(db.String(255))  # New column for photo path
 
 @app.route('/')
 def home():
@@ -76,10 +77,16 @@ def clock():
         return redirect(url_for('login'))
     photo = request.files['photo']
     if photo:
-        photo_path = f'static/photos/{session["user_id"]}_{datetime.utcnow().isoformat()}.jpg'
+        filename = f'{session["user_id"]}_{datetime.utcnow().isoformat().replace(":", "-")}.jpg'
+        photo_path = os.path.join('static/photos', filename)
         photo.save(photo_path)
+        
         clock_type = request.form['type']
-        new_record = Attendance(user_id=session['user_id'], type=clock_type)
+        new_record = Attendance(
+            user_id=session['user_id'], 
+            type=clock_type, 
+            photo_path=photo_path
+        )
         db.session.add(new_record)
         db.session.commit()
         return redirect(url_for('dashboard'))
@@ -88,8 +95,10 @@ def clock():
 @app.route('/export')
 def export():
     records = Attendance.query.all()
-    df = pd.DataFrame([(r.user_id, r.timestamp, r.type) for r in records],
-                      columns=['User ID', 'Timestamp', 'Type'])
+    df = pd.DataFrame(
+        [(r.user_id, r.timestamp, r.type, r.photo_path) for r in records],
+        columns=['User ID', 'Timestamp', 'Type', 'Photo Path']
+    )
     csv_path = 'attendance_records.csv'
     df.to_csv(csv_path, index=False)
     return send_file(csv_path, as_attachment=True)
