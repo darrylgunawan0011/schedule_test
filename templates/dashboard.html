@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - Attendance</title>
+    <style>
+        video { width: 320px; height: 240px; }
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+    <h2>Welcome to Attendance System</h2>
+    <form id="clockForm" method="POST" action="/clock" enctype="multipart/form-data">
+        <input type="hidden" name="type" id="clockType">
+        <input type="file" name="photo" id="photoInput" accept="image/*" capture="user" style="display:none;">
+        <video id="video" autoplay></video>
+        <button type="button" onclick="capturePhoto('in')">Clock In</button>
+        <button type="button" onclick="capturePhoto('out')">Clock Out</button>
+        <canvas id="canvas"></canvas>
+    </form>
+    <a href="/export">Export Attendance</a>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+            video.srcObject = stream;
+        });
+        function capturePhoto(type) {
+            document.getElementById('clockType').value = type;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+            canvas.toBlob(blob => {
+                const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+                const formData = new FormData(document.getElementById('clockForm'));
+                formData.append('photo', file);
+                fetch('/clock', { method: 'POST', body: formData }).then(response => {
+                    if (response.ok) location.reload();
+                    else alert('Clock-in/out failed.');
+                });
+            }, 'image/jpeg');
+        }
+    </script>
+</body>
+</html>
