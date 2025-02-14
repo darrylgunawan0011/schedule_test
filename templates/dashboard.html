@@ -9,41 +9,74 @@
 </head>
 <body>
     <h2>Welcome to Attendance System</h2>
+    <p id="status"></p>
     <form id="clockForm" method="POST" action="/clock" enctype="multipart/form-data">
         <input type="hidden" name="type" id="clockType">
+        <input type="file" name="photo" id="photoInput" style="display:none;">
         <video id="video" autoplay></video>
-        <canvas id="canvas"></canvas>
+        <button type="button" onclick="startCamera()">Enable Camera</button>
         <button type="button" onclick="capturePhoto('in')">Clock In</button>
         <button type="button" onclick="capturePhoto('out')">Clock Out</button>
+        <canvas id="canvas"></canvas>
     </form>
     <a href="/export">Export Attendance</a>
 
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const context = canvas.getContext('2d');
-        
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => video.srcObject = stream)
-            .catch(() => alert('Camera access is required for clock-in/out.'));
+        let stream = null;
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                video.play();
+                document.getElementById('status').innerText = "Camera is active.";
+            } catch (error) {
+                document.getElementById('status').innerText = "Camera access denied.";
+                alert('Camera permission is required for clocking in/out.');
+            }
+        }
 
         function capturePhoto(type) {
-            document.getElementById('clockType').value = type;
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            if (!stream) {
+                alert('Please enable the camera first.');
+                return;
+            }
+
+            // Capture photo from video stream
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0);
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert canvas to blob and submit
             canvas.toBlob(blob => {
                 if (!blob) {
-                    alert('Photo capture failed. Please try again.');
+                    alert('Error capturing photo.');
                     return;
                 }
+
                 const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
                 const formData = new FormData(document.getElementById('clockForm'));
                 formData.append('photo', file);
-                
-                fetch('/clock', { method: 'POST', body: formData })
-                    .then(response => response.ok ? location.reload() : alert('Clock-in/out failed.'))
-                    .catch(() => alert('Error submitting attendance.'));
+                formData.append('type', type);
+
+                fetch('/clock', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert(`Clock ${type} successful.`);
+                        location.reload();
+                    } else {
+                        alert('Clock-in/out failed.');
+                    }
+                })
+                .catch(() => alert('Network error.'));
             }, 'image/jpeg');
         }
     </script>
