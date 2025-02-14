@@ -18,25 +18,42 @@
         <canvas id="canvas"></canvas>
     </form>
     <a href="/export">Export Attendance</a>
+
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const context = canvas.getContext('2d');
+
         navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
             video.srcObject = stream;
+        }).catch(error => {
+            alert('Error accessing camera: ' + error.message);
         });
+
         function capturePhoto(type) {
             document.getElementById('clockType').value = type;
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0);
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
             canvas.toBlob(blob => {
                 const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
-                const formData = new FormData(document.getElementById('clockForm'));
+                const formData = new FormData();
+                formData.append('type', type);
                 formData.append('photo', file);
-                fetch('/clock', { method: 'POST', body: formData }).then(response => {
-                    if (response.ok) location.reload();
-                    else alert('Clock-in/out failed.');
+
+                fetch('/clock', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => {
+                    if (response.ok) {
+                        alert(type.charAt(0).toUpperCase() + type.slice(1) + ' recorded successfully!');
+                        location.reload();
+                    } else {
+                        alert('Clock-in/out failed.');
+                    }
+                }).catch(error => {
+                    alert('Error submitting clock-in/out: ' + error.message);
                 });
             }, 'image/jpeg');
         }
